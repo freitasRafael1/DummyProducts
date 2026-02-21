@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">DummyProducts</string>
+    <string name="request_problem">Request Problem</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="response_problem">response problem</string>
+    <string name="response_problem2">Response Problem</string>
 </resources>

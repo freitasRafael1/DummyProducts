@@ -1,114 +1,85 @@
 package br.edu.ifsp.scl.sdm.dummyproducts.ui
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
 import android.os.Bundle
-import android.renderscript.ScriptGroup
-import android.view.View
-import android.view.ViewParent
-import android.widget.Adapter
-import android.widget.AdapterView
-import android.widget.ImageView
+import android.widget.ArrayAdapter
+import android.widget.ListView
 import android.widget.Toast
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.appcompat.app.AppCompatActivity
 import br.edu.ifsp.scl.sdm.dummyproducts.R
-import br.edu.ifsp.scl.sdm.dummyproducts.adapter.ProductAdapter
-import br.edu.ifsp.scl.sdm.dummyproducts.adapter.ProductImageAdapter
-import br.edu.ifsp.scl.sdm.dummyproducts.databinding.ActivityMainBinding
-import br.edu.ifsp.scl.sdm.dummyproducts.model.DummyJSONAPI
-import br.edu.ifsp.scl.sdm.dummyproducts.model.Product
-import br.edu.ifsp.scl.sdm.dummyproducts.model.ProductList
 import com.android.volley.Request
-import com.android.volley.toolbox.ImageRequest
-import com.android.volley.toolbox.StringRequest
-import com.google.gson.Gson
-import com.google.gson.JsonSyntaxException
-import java.io.BufferedInputStream
-import java.io.IOException
-import java.io.InputStreamReader
-import java.net.HttpURLConnection.HTTP_OK
-import java.net.URL
-import java.nio.Buffer
-import javax.net.ssl.HttpsURLConnection
+import com.android.volley.toolbox.JsonArrayRequest
+
 
 class MainActivity : AppCompatActivity() {
-    private val amb: ActivityMainBinding by lazy {
-        ActivityMainBinding.inflate(layoutInflater)
-    }
-    private val productList: MutableList<Product> = mutableListOf()
-    private val productAdapter: ProductAdapter by lazy {
-        ProductAdapter(
-            this,
-            productList
-        )
-    }
-    private val productImagesList: MutableList<Bitmap> = mutableListOf()
-    private val productImagesAdapter: ProductImageAdapter by lazy {
-        ProductImageAdapter(this, productImagesList)
-    }
 
+    private lateinit var listView: ListView
+    private var photos: List<Photo> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(amb.root)
+        setContentView(R.layout.activity_main)
 
-        setSupportActionBar(amb.mainTb.apply {
-            title = getString(R.string.app_name)
-        })
+        listView = findViewById(R.id.lvPhotos)
 
-        amb.productsSp.apply {
-            adapter = productAdapter
-            onItemSelectedListener = object: AdapterView.OnItemSelectedListener {
-                //quando o ususario selecionar um produto esse listener vai tratar de buscar a imagem do produto
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    val size = productImagesList.size
-                    productImagesList.clear()
-                    productImagesAdapter.notifyItemRangeRemoved(0, size)
-                    retrieveProductsImages(productList[position])
-                }
-
-                    override fun onNothingSelected(parent: AdapterView<*>?) {
-                        // NSA
-
-                }
-            }
-            }
-
-        amb.productImagesRv.apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = productImagesAdapter
-        }
-
-        retrieveProducts()
+        loadPhotos()
     }
 
-    private fun retrieveProducts() =
-        DummyJSONAPI.ProductListRequest({productList ->
-            productList.products.also {
-                productAdapter.addAll(it)
-            }
-        },{
-            Toast.makeText(this, getString(R.string.request_problem), Toast.LENGTH_SHORT).show()
-        }).also {
-            DummyJSONAPI.getInstance(this).addToRequestQueue(it) }
+    private fun loadPhotos() {
+        val url = "https://jsonplaceholder.typicode.com/photos"
 
-
-    private fun retrieveProductsImages(product: Product) =
-        product.images.forEach{ imageUrl ->
-            ImageRequest(imageUrl, { response ->
-                productImagesList.add(response)
-                productImagesAdapter.notifyItemInserted(productImagesList.lastIndex)
-            }, 0, 0, ImageView.ScaleType.CENTER, Bitmap.Config.ARGB_8888, {
-                Toast.makeText(this, getString(R.string.request_problem), Toast.LENGTH_SHORT).show()
-            }).also{
-                DummyJSONAPI.getInstance(this).addToRequestQueue(it)
+        val request = JsonArrayRequest(
+            Request.Method.GET,
+            url,
+            null,
+            { response ->
+                val list = mutableListOf<Photo>()
+                for (i in 0 until response.length()) {
+                    val obj = response.getJSONObject(i)
+                    val photo = Photo(
+                        albumId = obj.getInt("albumId"),
+                        id = obj.getInt("id"),
+                        title = obj.getString("title"),
+                        url = obj.getString("url"),
+                        thumbnailUrl = obj.getString("thumbnailUrl")
+                    )
+                    list.add(photo)
+                }
+                photos = list
+                showTitles()
+            },
+            { error ->
+                Toast.makeText(
+                    this,
+                    "Erro ao carregar fotos: ${error.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
+        )
+
+        MySingleton.getInstance(this).addToRequestQueue(request)
+    }
+
+    private fun showTitles() {
+        val titles = photos.map { it.title }
+
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            titles
+        )
+
+        listView.adapter = adapter
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val selected = photos[position]
+
+            val intent = Intent(this, PhotoDetailActivity::class.java).apply {
+                putExtra("title", selected.title)
+                putExtra("url", selected.url)
+                putExtra("thumb", selected.thumbnailUrl)
+            }
+            startActivity(intent)
         }
-
+    }
 }
